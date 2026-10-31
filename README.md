@@ -612,17 +612,17 @@ python3 tester.py --show=all samples/3-status-10.in
 
 > 注：下方为**暂定**的评分规则，可能会有所更改，但不影响项目的实现
 
-每个测试点均为正整数分，原始分直接计入所属功能类别；Bonus 分别统计`remote`和`diff + show`两个 15 分类别，并取二者较高值计入最终得分。各组分数总和如下：
+Basic 每个测试点均为 1 分，原始分直接计入所属功能类别；Bonus 分别统计`remote`和`diff + show`两个 15 分类别，并取二者较高值计入最终得分。各组分数总和如下：
 
-`Subtask 1`: 10 `pts`
+`Subtask 1`: 9 `pts`
 
-`Subtask 2`: 10 `pts`
+`Subtask 2`: 5 `pts`
 
 `Subtask 3`: 15 `pts`
 
 `Subtask 4`: 15 `pts`
 
-`Subtask 5`: 15 `pts`
+`Subtask 5`: 11 `pts`
 
 `Complement`: 10 `pts`
 
@@ -632,9 +632,9 @@ python3 tester.py --show=all samples/3-status-10.in
 
 设计文档与码风共 5 `pts`。我们会根据你的`DESIGN.md`以及代码布局与风格评分，包括适当的注释、合理的空行和清晰的模块设计等。
 
-Code Review 占 15 `pts`。
+Code Review 共 25 `pts`：实际 Git 操作 8 分，围绕 Gitlite 设计与实现的提问 17 分。提问包括 Basic 题 13 分和 Bonus 题 4 分；Bonus 题选择 `remote` 或 `diff + show` 中的一类作答，未实现任一类则该部分不得分。
 
-本项目总分为 110 `pts`：Basic（Subtask 1～5 与 Complement）75 分、Bonus 15 分、设计文档与码风 5 分、Code Review 15 分。
+本项目总分为 110 `pts`：Basic（Subtask 1～5 与 Complement）65 分、Bonus 15 分、设计文档与码风 5 分、Code Review 25 分。
 
 ## Acknowledgement
 
