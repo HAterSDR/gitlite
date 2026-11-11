@@ -1,6 +1,9 @@
 #ifndef REPOSITORY_H
 #define REPOSITORY_H
 
+#include "../include/ObjectStore.h"
+#include "../include/RefStore.h"
+#include "../include/Commit.h"
 #include <string>
 
 // 建议类：抽象仓库的持久化状态，包括 HEAD、分支、标签、暂存区与对象库；

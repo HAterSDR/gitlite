@@ -7,7 +7,7 @@ project(gitlite LANGUAGES CXX)
 # 1. 在 build/ 中创建一个名称为 gitlite 的可执行目标；
 # 2. 将 main.cpp 和所有需要的实现文件加入该目标；
 # 3. 自行设置所需的 C++ 标准、头文件目录和编译选项。
-
+add_executable(gitlite ...)
 
 # ==================== ACMOJ 配置（请勿删除）====================
 # ACMOJ 的 Git 评测会从仓库根目录读取名为 code 的编译产物。

@@ -1,4 +1,12 @@
 #include "../include/SomeObj.h"
+#include "../include/Utils.h"
+#include "../include/GitliteException.h"
+#include "../include/Index.h"
+#include "../include/Ignore.h"
+#include "../include/Repository.h" 
+#include <iostream>
+#include <ctime>
+#include <vector>
 
 SomeObj::SomeObj() {}
 
