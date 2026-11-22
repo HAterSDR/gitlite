@@ -3,6 +3,7 @@
 #include "../include/Utils.h"
 std::string ObjectStore::WriteObject(const std::string& type,const std::string& content){
     //将内容转换为sha后写入objects；type用来区分文件名和commit记录
+    //objects的结构为 objects/sha前两位/sha后38位
     std::string full = type + " " + content;
     std::string sha = Utils::sha1(full);
     std::string dir = ".gitlite/objects/" + sha.substr(0,2);
@@ -14,6 +15,7 @@ std::string ObjectStore::WriteObject(const std::string& type,const std::string& 
     return sha;
 };
 std::string ObjectStore::ReadObject(std::string id){
+    //获取对应id中的objects
     std::string type_sha = id.substr(0,2);
     std::string content_sha = id.substr(2);
     std::string filepath = ".gitlite/objects/"+ type_sha + "/" + content_sha;
@@ -22,4 +24,7 @@ std::string ObjectStore::ReadObject(std::string id){
         full = Utils::readContentsAsString(filepath);
     }
     return full;
+};
+std::string ObjectStore::BlobID(std::string content){
+    return Utils::sha1("blob " + content);
 };

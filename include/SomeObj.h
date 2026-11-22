@@ -23,8 +23,7 @@ public:
 
     void checkoutBranch(const std::string& b);                      // gitlite checkout [分支名]
     void checkoutFile(const std::string& f);                        // gitlite checkout -- [文件名]
-    void checkoutFileInCommit(const std::string& rev,
-                              const std::string& f);                // gitlite checkout [revision] -- [文件名]
+    void checkoutFileInCommit(const std::string& rev, const std::string& f);                // gitlite checkout [revision] -- [文件名]
 
     void branch(const std::string& b);  // gitlite branch [分支名]
     void rmBranch(const std::string& b);// gitlite rm-branch [分支名]
@@ -42,6 +41,9 @@ public:
     void diffBetween(const std::string& rev1, const std::string& rev2);// gitlite diff [revision1] [revision2]
     void show();                                                    // gitlite show
     void show(const std::string& rev);                              // gitlite show [revision]
+private:
+    bool IsValidRefName(std::string name);
+    bool PrintSection(const std::string& title, std::vector<std::string> items);
 };
 
 #endif // SOME_OBJ_H

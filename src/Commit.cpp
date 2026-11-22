@@ -20,7 +20,7 @@ std::string Commit::Serialize() const{
 Commit Commit::Deserialize(const std::string& text){
     Commit commit_;
     //反序列化commit的信息
-    std::istringstream in;
+    std::istringstream in(text);
     std::string line;
     while(getline(in, line)){
         if(line.empty()) continue;
@@ -36,4 +36,26 @@ Commit Commit::Deserialize(const std::string& text){
     }
     return commit_;
 }
+bool Commit::isTracked(const std::string& filename) const{
+    return snapshot.count(filename) > 0;
+}
+std::string Commit::id() const{
+    std::string text = (*this).Serialize();
+    return Utils::sha1("commit " + text);
+}
+void Commit::Print() const{
+    Commit current = *this;
+    std::string CurrentID = id(); 
+    std::cout << "===\n";
+    std::cout << "commit "<< CurrentID << "\n";
+    if(current.parents.size() >= 2){
+        std::cout << "Merge: " << current.parents[0].substr(0,7) << " " << current.parents[1].substr(0,7) << "\n";
+    }
+    std::time_t t = static_cast<std::time_t>(current.timestamp);
+    std::tm* tm = std::localtime(&t);
+    char TimeBuffer[80];
+    std::strftime(TimeBuffer, sizeof(TimeBuffer), "%a %b %d %H:%M:%S %Y %z", tm);
+    std::cout << "Date: " << TimeBuffer << "\n";
+    std::cout << current.message << "\n\n";
+};
 // 建议类 Commit 的实现文件，可按需使用或删除。

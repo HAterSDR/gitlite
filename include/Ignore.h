@@ -7,7 +7,7 @@
 class Ignore{
 public:
     void load();
-    bool IsIgnored(const std::string& filename)const;
+    bool IsIgnored(const std::string& filename) const;
 private:
     enum class TokType { Star, Qmark, Lit };
     struct Tok {

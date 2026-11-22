@@ -15,8 +15,10 @@ class Commit{
         std::map<std::string, std::string> snapshot;
         Commit();
         std::string  Serialize() const;
-        static Commit Deserialize(const std::string& next);
+        static Commit Deserialize(const std::string& text);
+        bool isTracked(const std::string& filename) const;
         std::string id() const;
+        void Print() const;
 };
 
 #endif // COMMIT_H
