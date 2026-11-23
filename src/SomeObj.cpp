@@ -33,12 +33,12 @@ void SomeObj::add(const std::string& filename) {
     Ignore ignore;
     ignore.load();
     index.load();
-    if(ignore.IsIgnored(filename)||!current.isTracked(filename)||!index.IsStageAdd(filename)){
+    if(ignore.IsIgnored(filename)&&!current.isTracked(filename)&&!index.IsStageAdd(filename)){
         return;
     }
     //对比commit中记录的文件内容是否与待提交文件一致
     std::string content = Utils::readContentsAsString(filename);
-    std::string NewID = ObjectStore::BlobID(content);
+    std::string NewID = ObjectStore::WriteObject("blob",content);
     std::string OldID = "";
     if(current.snapshot.count(filename) > 0){
         OldID = current.snapshot[filename];
@@ -100,12 +100,13 @@ void SomeObj::rm(const std::string& filename) {
     if(!commit.isTracked(filename)&&!index.IsStageAdd(filename)){
         Utils::exitWithMessage("No reason to remove the file.");
     }
-    //未被跟踪，暂存区中删除
+    //暂存但未被跟踪，暂存区中删除
     if(!commit.isTracked(filename)){
         index.StagedAdd.erase(filename);
         index.save();
         return;
     }
+    index.StagedAdd.erase(filename);
     index.StagedRemove.insert(filename);
     if(Utils::isFile(filename)){
         Utils::restrictedDelete(filename);
@@ -222,7 +223,7 @@ void SomeObj::tag(const std::string& name, const std::string& rev) {
 }
 
 // ---------------- Subtask 3：status / branch / rm-branch ----------------
-bool SomeObj::PrintSection(const std::string& title, std::vector<std::string> items){
+void SomeObj::PrintSection(const std::string& title, std::vector<std::string> items){
     //辅助打印函数
     std::cout << "=== " << title << " ===\n";
     std::sort(items.begin(), items.end());
@@ -383,16 +384,16 @@ void SomeObj::checkoutBranch(const std::string& name) {
     if (Repository::HasUntracked(current, target, index, ignore)) {
         Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
     }
-    RefStore::WriteHEAD(name);
     Repository::CheckOutSnapshot(current, target);
+    RefStore::WriteHEAD(name);
     index.clear();
     index.save();
 }
 
 void SomeObj::checkoutFile(const std::string& filename) {
     // TODO: 用当前提交中的版本覆盖工作目录中的文件
-    Commit commit = Repository::GetCurrentCommit();
-    checkoutFileInCommit(commit.id(), filename);
+    std::string CurrID = RefStore::ReadRef(RefStore::ReadHEAD());
+    checkoutFileInCommit(CurrID, filename);
 }
 
 void SomeObj::checkoutFileInCommit(const std::string& rev, const std::string& filename) {
@@ -420,8 +421,8 @@ void SomeObj::reset(const std::string& rev) {
     if(Repository::HasUntracked(current, target, index, ignore)){
         Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
     }
-    RefStore::WriteRef(RefStore::ReadHEAD(), CommitID);
     Repository::CheckOutSnapshot(current, target);
+    RefStore::WriteRef(RefStore::ReadHEAD(), CommitID);
     index.clear();
     index.save();
 }
@@ -457,10 +458,13 @@ void SomeObj::merge(const std::string& branch) {
     }
     if(SplitID == CurrID){
         //改变当前分支引用头
-        auto plan = Repository::GenerateMergePlan(curr, curr, given);
-        Repository::ApplyMergePlan(plan, index, curr, given, ignore);
-        index.save();
+        if (Repository::HasUntracked(curr, given, index, ignore)) {
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+        Repository::CheckOutSnapshot(curr, given);
         RefStore::WriteRef(CurrBranch, GivenID);
+        index.clear();
+        index.save();
         std::cout << "Current branch fast-forwarded.\n";
         return;
     }

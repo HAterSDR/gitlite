@@ -36,7 +36,7 @@ void Index::save() const{
     for(const std::string& filename : StagedRemove){
         out << "remove " << filename << "\n";
     }
-    std::string path = "./gitlite/index";
+    std::string path = ".gitlite/index";
     Utils::writeContents(path,out.str());
 }
 void Index::clear(){

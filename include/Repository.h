@@ -4,6 +4,8 @@
 #include "../include/ObjectStore.h"
 #include "../include/RefStore.h"
 #include "../include/Commit.h"
+#include "../include/Index.h"
+#include "../include/Ignore.h"
 #include <string>
 
 // 建议类：抽象仓库的持久化状态，包括 HEAD、分支、标签、暂存区与对象库；
@@ -26,7 +28,7 @@ public:
     static Commit GetCurrentCommit();
     static void SaveCommit(const Commit& commit);
     static std::string ResolveRevision(const std::string& rev);
-    static std::string RestoreFromCommit(const Commit& commit, const std::string& filename);
+    static void RestoreFromCommit(const Commit& commit, const std::string& filename);
     static void CheckOutSnapshot(const Commit& current, const Commit& target);
     static bool HasUntracked(const Commit& current, const Commit& target, const Index& index, const Ignore& ignore);
     static Commit GetCommitbyID(const std::string ID);

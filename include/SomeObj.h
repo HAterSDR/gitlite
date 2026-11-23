@@ -2,7 +2,7 @@
 #define SOME_OBJ_H
 
 #include <string>
-
+#include <vector>
 // main.cpp 的命令门面。main.cpp 不可修改，故本类声明不可改动；
 // 请在 src/SomeObj.cpp 中实现各命令，具体逻辑建议拆分到自行设计的类中。
 class SomeObj {
@@ -43,7 +43,7 @@ public:
     void show(const std::string& rev);                              // gitlite show [revision]
 private:
     bool IsValidRefName(std::string name);
-    bool PrintSection(const std::string& title, std::vector<std::string> items);
+    void PrintSection(const std::string& title, std::vector<std::string> items);
 };
 
 #endif // SOME_OBJ_H

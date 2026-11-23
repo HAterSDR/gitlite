@@ -20,7 +20,12 @@ std::string Commit::Serialize() const{
 Commit Commit::Deserialize(const std::string& text){
     Commit commit_;
     //反序列化commit的信息
-    std::istringstream in(text);
+    //去掉开头的commit
+    std::string CleanText = text;
+    if (CleanText.rfind("commit ", 0) == 0) {
+        CleanText = CleanText.substr(7); 
+    }
+    std::istringstream in(CleanText);
     std::string line;
     while(getline(in, line)){
         if(line.empty()) continue;

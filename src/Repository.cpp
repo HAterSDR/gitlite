@@ -86,7 +86,7 @@ std::string Repository::ResolveRevision(const std::string& rev){
     return "";
 };
 
-std::string Repository::RestoreFromCommit(const Commit& commit, const std::string& filename){
+void Repository::RestoreFromCommit(const Commit& commit, const std::string& filename){
     //将commit中filename文件写入工作区
     std::string BlobID = commit.snapshot.at(filename);
     std::string content = ObjectStore::ReadObject(BlobID);
@@ -102,7 +102,7 @@ void Repository::CheckOutSnapshot(const Commit& current, const Commit& target){
     for(const auto& pair : current.snapshot){
         const std::string& file = pair.first;
         if(target.snapshot.find(file) == target.snapshot.end()){
-            if(Utils::isFile){
+            if(Utils::isFile(file)){
                 Utils::restrictedDelete(file);
             }
         }
@@ -174,7 +174,7 @@ std::vector<Repository::MergeItem> Repository::GenerateMergePlan(const Commit& s
         if(CurrID == GivenID) continue;
         if(CurrID == SplitID && GivenID != SplitID){
             //指定commit中文件不存在，删除
-            if(GivenID == "") plan.push_back({file, MergeAction::Delete});
+            if(GivenID == "") plan.push_back({file, MergeAction::Delete,""});
             else{
                 //指定commit中文件存在，替换
                 plan.push_back({file, MergeAction::Write, GivenID});
@@ -183,7 +183,7 @@ std::vector<Repository::MergeItem> Repository::GenerateMergePlan(const Commit& s
         //否则冲突，两边情况不一
         else if(GivenID == SplitID && CurrID != SplitID) continue;
         else{
-            plan.push_back({file, MergeAction::Conflict});
+            plan.push_back({file, MergeAction::Conflict,""});
         }
     }
     return plan;
@@ -206,6 +206,8 @@ bool Repository::ApplyMergePlan(const std::vector<MergeItem>& plan, Index& index
             if(Utils::isFile(item.filename)){
                 Utils::restrictedDelete(item.filename);
             }
+            index.StagedAdd.erase(item.filename);
+            index.StagedRemove.insert(item.filename);
          }
         if(item.action == MergeAction::Write){
             //若为待改写，将blobid写入
@@ -222,7 +224,8 @@ bool Repository::ApplyMergePlan(const std::vector<MergeItem>& plan, Index& index
             : "";
             //按规矩生成conflict text
             std::string ConflictText = "<<<<<<< HEAD\n";
-            
+            CurrContent = ObjectStore::ReadBlob(CurrContent);
+            GivenContent = ObjectStore::ReadBlob(GivenContent);
             // 如果当前内容不以换行符结尾，补齐一个
             if (!CurrContent.empty() && CurrContent.back() != '\n') {
                 CurrContent += "\n";

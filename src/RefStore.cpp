@@ -17,7 +17,7 @@ void RefStore::WriteRef(const std::string& branch,const std::string& CommitID){
 };
 std::string RefStore::ReadHEAD(){
     //读取当前分支名
-    std::string path = "/.gitlite/HEAD";
+    std::string path = ".gitlite/HEAD";
     std::string content = Utils::readContentsAsString(path);
     std::string prefix = "ref: refs/heads/";
     if(content.rfind(prefix,0) == 0) return content.substr(prefix.length());
@@ -25,7 +25,7 @@ std::string RefStore::ReadHEAD(){
 };
 void RefStore::WriteHEAD(const std::string& branch){
     //改变当前分支
-    std::string path = "/.gitlite/HEAD";
+    std::string path = ".gitlite/HEAD";
     std::string content = "ref: refs/heads/" + branch;
     Utils::writeContents(path, content);
 };
@@ -39,4 +39,5 @@ std::string RefStore::WriteTag(const std::string& name, const std::string& Commi
     //向指定tag文件中写入commitid，如果不存在则创建
     std::string path = ".gitlite/refs/tags/" + name;
     Utils::writeContents(path, CommitID);
+    return CommitID;
 };
