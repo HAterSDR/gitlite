@@ -7,7 +7,9 @@
 #include <fstream>
 void Index::load(){
     //从index中加载add与remove内容
+    //预处理，清空当前Index
     clear();
+    //从路径中读取内容
     std::string path = ".gitlite/index";
     if(!Utils::isFile(path)) return;
     std::string content = Utils::readContentsAsString(path);
@@ -16,6 +18,7 @@ void Index::load(){
     while(std::getline(in, line)){
         if(line.empty()) continue;
         std::istringstream linestream(line);
+        //根据index的格式：add filename blobID : remove filename 读取
         std::string action, filename, BlobID;
         linestream >> action >> filename;
         if(action == "add"){
@@ -40,12 +43,15 @@ void Index::save() const{
     Utils::writeContents(path,out.str());
 }
 void Index::clear(){
+    //清空index
     StagedAdd.clear();
     StagedRemove.clear();
 }
 bool Index::IsStageAdd(const std::string& filename) const{
+    //判断是否暂存待添加
     return StagedAdd.count(filename) > 0;
 }
 bool Index::IsStageRemove(const std::string& filename) const{
+    //判断是否暂存待删除
     return StagedRemove.count(filename) > 0;
 }

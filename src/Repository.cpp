@@ -27,6 +27,7 @@ void Repository::Init(){
     Utils::writeContents(".gitlite/index", "");
 }
 std::string Repository::GetCurrentBranch(){
+    //返回当前branch名
     return RefStore::ReadHEAD();
 }
 Commit Repository::GetCurrentCommit(){
@@ -71,7 +72,7 @@ std::string Repository::ResolveRevision(const std::string& rev){
             std::string FullHash = DirPrefix + fileName;
             //判断是否以用户输入的前缀开头
             if (FullHash.rfind(rev, 0) == 0) {
-                // 去读一下内容，确认它是 commit 而不是 blob
+                //去读一下内容，确认它是 commit而不是blob
                 std::string content = Utils::readContentsAsString(SubDir + "/" + fileName);
                 if (content.rfind("commit ", 0) == 0) {
                     matches.push_back(FullHash);
@@ -79,6 +80,7 @@ std::string Repository::ResolveRevision(const std::string& rev){
             }
         }
     }
+    //若部分匹配，返回字典序最小的
     if (!matches.empty()) {
         std::sort(matches.begin(), matches.end());
         return matches[0];
@@ -96,9 +98,11 @@ void Repository::RestoreFromCommit(const Commit& commit, const std::string& file
 
 void Repository::CheckOutSnapshot(const Commit& current, const Commit& target){
     //用target中内容，比对current中内容后整体替换、删除工作区文件
+    //target中内容逐个写入
     for(auto const& pair : target.snapshot){
         RestoreFromCommit(target,pair.first);
     }
+    //current中被跟踪且target中未被跟踪的内容直接删除
     for(const auto& pair : current.snapshot){
         const std::string& file = pair.first;
         if(target.snapshot.find(file) == target.snapshot.end()){
@@ -121,6 +125,7 @@ bool Repository::HasUntracked(const Commit& current, const Commit& target, const
         return false;
 };
 Commit Repository::GetCommitbyID(const std::string ID){
+    //获取commit对应的id
     std::string text = ObjectStore::ReadObject(ID);
     return Commit::Deserialize(text);
 };
@@ -167,11 +172,13 @@ std::vector<Repository::MergeItem> Repository::GenerateMergePlan(const Commit& s
     }
     //判断所有文件状态，生成MergeItem，插入vector中
     for(const std::string& file: Files){
+        //获得三个commit中file的id
         std::string SplitID = split.snapshot.count(file) ? split.snapshot.at(file) : "";
         std::string CurrID = curr.snapshot.count(file) ? curr.snapshot.at(file) : "";
         std::string GivenID = given.snapshot.count(file) ? given.snapshot.at(file) : "";
         //版本一致，跳过
         if(CurrID == GivenID) continue;
+        //当前commit与分割点commit内容一致
         if(CurrID == SplitID && GivenID != SplitID){
             //指定commit中文件不存在，删除
             if(GivenID == "") plan.push_back({file, MergeAction::Delete,""});
@@ -180,9 +187,10 @@ std::vector<Repository::MergeItem> Repository::GenerateMergePlan(const Commit& s
                 plan.push_back({file, MergeAction::Write, GivenID});
             }
         }
-        //否则冲突，两边情况不一
+        //指定commit与分割点commit内容一致，不用管
         else if(GivenID == SplitID && CurrID != SplitID) continue;
         else{
+            //否则冲突，两边情况不一
             plan.push_back({file, MergeAction::Conflict,""});
         }
     }
@@ -194,7 +202,7 @@ bool Repository::ApplyMergePlan(const std::vector<MergeItem>& plan, Index& index
         if (item.action != MergeAction::Keep) {
             // 工作区存在该文件 && 未被当前提交跟踪 && 未暂存待添加 && 未被忽略
             if (Utils::isFile(item.filename) && !CurrCommit.isTracked(item.filename) && !index.IsStageAdd(item.filename) && !ignore.IsIgnored(item.filename)) {
-                // 发现冲突，直接返回 true，交由上层去 exitWithMessage
+                // 发现冲突，直接exitWithMessage
                 Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
             }
         }
@@ -206,11 +214,12 @@ bool Repository::ApplyMergePlan(const std::vector<MergeItem>& plan, Index& index
             if(Utils::isFile(item.filename)){
                 Utils::restrictedDelete(item.filename);
             }
+            //暂存待删除
             index.StagedAdd.erase(item.filename);
             index.StagedRemove.insert(item.filename);
          }
         if(item.action == MergeAction::Write){
-            //若为待改写，将blobid写入
+            //若为待改写，将blob id写入
             std::string text = ObjectStore::ReadObject(item.BlobID).substr(5);
             Utils::writeContents(item.filename, text);
             index.StagedAdd[item.filename] = item.BlobID;
@@ -247,4 +256,77 @@ bool Repository::ApplyMergePlan(const std::vector<MergeItem>& plan, Index& index
     }
     //特别返回是否有冲突
     return HasConflict;
+};
+std::map<std::string, std::string> Repository::ReadConfig(){
+    //返回以map形式存储的config内容
+    std::map<std::string, std::string>configs;
+    std::string path = ".gitlite/config";
+    if(!Utils::isFile(path)) return configs;
+    //读取config中内容，转化为map
+    std::string content = Utils::readContentsAsString(path);
+    std::istringstream in(content);
+    std::string line;
+    while(getline(in, line)){
+        if(line.empty()) continue;
+        std::istringstream linestream(line);
+        std::string BranchName;
+        std::string BranchPath;
+        linestream >> BranchName;
+        std::getline(linestream, BranchPath);
+        //去除getline遗留的前导空格
+        if(!BranchPath.empty() && BranchPath[0] == ' '){
+            BranchPath = BranchPath.substr(1);
+        }
+        if(!BranchName.empty() && !BranchPath.empty()){
+            configs[BranchName] = BranchPath;
+        }
+    }
+    return configs;
+};
+void Repository::SaveConfig(const std::map<std::string, std::string>& configs){
+    //将map中内容全部写入config中
+    std::ostringstream out;
+    for(const auto& p : configs){
+        out << p.first << " "<< p.second << "\n";
+    }
+    Utils::writeContents(".gitlite/config", out.str());
+};
+
+void Repository::CopyObjects(const std::string SrcRepo, const std::string TargetRepo){
+    //将SrcRepo中objects所有内容全部添加到TargetRepo中且不覆盖原有内容
+    std::string SrcDir = SrcRepo + "/objects";
+    std::string TargetDir = TargetRepo + "/objects";
+    //遍历所有文件夹，拼接路径后写入
+    for(int i = 0;i < 256; i++){
+        char hex[3];
+        std::snprintf(hex, sizeof(hex), "%02x", i);
+        std::string SubDir = hex;
+        auto files = Utils::plainFilenamesIn(SrcDir + "/" +SubDir);
+        for(const auto& f : files){
+            std::string SrcFile = SrcDir + "/" + SubDir + "/" + f;
+            std::string TargetFile = TargetDir + "/" + SubDir + "/" + f;
+            if(!Utils::isFile(TargetFile)){
+                std::string content = Utils::readContentsAsString(SrcFile);
+                Utils::writeContents(TargetFile, content);
+            }
+        }
+    }
+};
+
+bool Repository::IsAncestor(const std::string& AncestorID, const std::string& DescendantID){
+    //判断AncestorID是不是DescendantID的祖先
+    std::set<std::string>visited;
+    std::queue<std::string>q;
+    q.push(DescendantID);
+    while(!q.empty()){
+        std::string ID = q.front();
+        q.pop();
+        if(ID == AncestorID) return true;
+        if(visited.count(ID)) continue;
+        visited.insert(ID);
+
+        Commit commit = GetCommitbyID(ID);
+        for(const auto& p : commit.parents) q.push(p);
+    }
+    return false;
 };

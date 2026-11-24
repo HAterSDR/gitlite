@@ -1,0 +1,13 @@
+samples/3-robust.in:
+command/check: branch dev
+Expected:
+
+Actual:
+A branch with that name already exists.
+
+Diff:
+--- expected
++++ actual
+@@ -0,0 +1 @@
++A branch with that name already exists.
+

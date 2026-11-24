@@ -15,6 +15,7 @@ SomeObj::SomeObj() {}
 
 void SomeObj::init() {
     // TODO: 创建 .gitlite 目录、initial commit 与 master 分支
+    //判断是否已初始化
     if(Utils::isDirectory(Repository::getGitliteDir())){
         Utils::exitWithMessage("A Gitlite version-control system already exists in the current directory.");
     }
@@ -44,10 +45,12 @@ void SomeObj::add(const std::string& filename) {
         OldID = current.snapshot[filename];
     }
     if(OldID != "" && NewID == OldID){
+        //一致，清空暂存区，其他不做动作
         index.StagedAdd.erase(filename);
         index.StagedRemove.erase(filename);
     }
     else{
+        //加入暂存区中
         index.StagedAdd[filename] = NewID;
         index.StagedRemove.erase(filename);
     }
@@ -106,6 +109,7 @@ void SomeObj::rm(const std::string& filename) {
         index.save();
         return;
     }
+    //取消暂存，标记为待删除并删除工作区文件
     index.StagedAdd.erase(filename);
     index.StagedRemove.insert(filename);
     if(Utils::isFile(filename)){
@@ -139,15 +143,17 @@ void SomeObj::globalLog() {
     std::queue<std::string> q;
     std::map<std::string, Commit> visited;
     std::vector<Commit> AllCommit;
-    //读取本地分支与tags内容
-    auto branches = Utils::plainFilenamesIn(".gitlite/refs/heads");
-    for (const auto& branch : branches) {
-        q.push(Utils::readContentsAsString(".gitlite/refs/heads/" + branch));
+    //读取本地分支与tags内容，加上远程分支
+    std::vector<std::pair<std::string, std::string>> refs;
+    RefStore::CollectRefs(".gitlite/refs/heads", "", refs);
+    RefStore::CollectRefs(".gitlite/refs/tags", "", refs);
+    RefStore::CollectRefs(".gitlite/refs/remotes", "", refs);
+    for (const auto& ref : refs) {
+        if (!ref.second.empty()) {
+            q.push(ref.second);
+        }
     }
-    auto tags = Utils::plainFilenamesIn(".gitlite/refs/tags");
-    for (const auto& tag : tags) {
-        q.push(Utils::readContentsAsString(".gitlite/refs/tags/" + tag));
-    }
+    //推入q中，全部加入Allcommit中并按时间和字典序排序打印
     while(!q.empty()){
         std::string id = q.front();
         q.pop();
@@ -195,10 +201,12 @@ bool SomeObj::IsValidRefName(std::string name){
 }
 void SomeObj::tag(const std::string& name) {
     // TODO: 为当前提交创建轻量标签
+    //名字是否合法
     if(!IsValidRefName(name)){
         Utils::exitWithMessage("Incorrect operands.");
     }
     std::string path = ".gitlite/refs/tags/" + name;
+    //tag名是否冲突
     if (Utils::isFile(path)) {
         Utils::exitWithMessage("A tag with that name already exists.");
     }
@@ -208,14 +216,17 @@ void SomeObj::tag(const std::string& name) {
 
 void SomeObj::tag(const std::string& name, const std::string& rev) {
     // TODO: 为指定提交或标签所指提交创建轻量标签
+    //名字是否合法
     if(!IsValidRefName(name)){
         Utils::exitWithMessage("Incorrect operands.");
     }
     std::string path = ".gitlite/refs/tags/" + name;
+    //tag名是否冲突
     if (Utils::isFile(path)) {
         Utils::exitWithMessage("A tag with that name already exists.");
     }
     std::string id = Repository::ResolveRevision(rev);
+    //commit是否存在
     if (id.empty()) {
         Utils::exitWithMessage("No commit with that id exists.");
     }
@@ -241,7 +252,14 @@ void SomeObj::status() {
     Ignore ignore;
     ignore.load();
     //处理branch
-    std::vector<std::string> branches = Utils::plainFilenamesIn(".gitlite/refs/heads");
+    std::vector<std::pair<std::string, std::string>> refs;
+    //收集remote和local中内容
+    RefStore::CollectRefs(".gitlite/refs/heads", "", refs);
+    RefStore::CollectRefs(".gitlite/refs/remotes", "", refs); 
+    std::vector<std::string> branches;
+    for (const auto& ref : refs) {
+        branches.push_back(ref.first);
+    }
     std::sort(branches.begin(), branches.end());
     for(auto& branch : branches){
         if(branch == NowBranch) branch = "*" + branch; 
@@ -307,8 +325,8 @@ void SomeObj::status() {
                     UntrackedFiles.push_back(file);
                 }
             } else if (isStagedRemove) {
-                // 特例（被跟踪，暂存删除了，但在工作区又重建了）
-                // 无论是否在 ignore 里，都强制显示
+                //特例（被跟踪，暂存删除了，但在工作区又重建了）
+                //无论是否在 ignore 里，都强制显示
                 UntrackedFiles.push_back(file);
             }
         }
@@ -344,6 +362,11 @@ void SomeObj::branch(const std::string& name) {
     if (Utils::isFile(path)) {
         Utils::exitWithMessage("A branch with that name already exists.");
     }
+    //判断是否与远程名重复
+    auto configs = Repository::ReadConfig();
+    if (configs.count(name)) {
+        Utils::exitWithMessage("A branch with that name already exists.");
+    }
     std::string branch = RefStore::ReadHEAD();
     std::string CommitID = RefStore::ReadRef(branch);
     RefStore::WriteRef(name, CommitID);
@@ -351,10 +374,16 @@ void SomeObj::branch(const std::string& name) {
 
 void SomeObj::rmBranch(const std::string& name) {
     // TODO: 删除分支指针，不删除其提交
+    //判断是否合法
+    if (!IsValidRefName(name)) {
+        Utils::exitWithMessage("Incorrect operands.");
+    }
+    //是否冲突
     std::string path = ".gitlite/refs/heads/" + name;
     if(!Utils::isFile(path)){
         Utils::exitWithMessage("A branch with that name does not exist.");
     }
+    //是否是当前提交
     if(name == Repository::GetCurrentBranch()){
         Utils::exitWithMessage("Cannot remove the current branch.");
     }
@@ -366,7 +395,7 @@ void SomeObj::rmBranch(const std::string& name) {
 void SomeObj::checkoutBranch(const std::string& name) {
     // TODO: 切换到指定分支
     //前置条件判断
-    std::string path = ".gitlite/refs/heads/" + name;
+    std::string path = RefStore::GetRefPath(name);
     if(!Utils::isFile(path)){
         Utils::exitWithMessage("No such branch exists.");
     }
@@ -384,6 +413,7 @@ void SomeObj::checkoutBranch(const std::string& name) {
     if (Repository::HasUntracked(current, target, index, ignore)) {
         Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
     }
+    //用函数直接将target中内容写入工作区，改变当前分支
     Repository::CheckOutSnapshot(current, target);
     RefStore::WriteHEAD(name);
     index.clear();
@@ -399,12 +429,14 @@ void SomeObj::checkoutFile(const std::string& filename) {
 void SomeObj::checkoutFileInCommit(const std::string& rev, const std::string& filename) {
     // TODO: 用指定 revision 的版本覆盖工作文件，支持标签与 id 缩写
     std::string CommitID = Repository::ResolveRevision(rev);
+    //判断特殊情况
     if(CommitID.empty()) Utils::exitWithMessage("No commit with that id exists.");
 
     Commit target = Repository::GetCommitbyID(CommitID);
     if(!target.isTracked(filename)){
         Utils::exitWithMessage("File does not exist in that commit.");
     }
+    //覆盖文件
     Repository::RestoreFromCommit(target, filename);
 }
 
@@ -412,17 +444,21 @@ void SomeObj::reset(const std::string& rev) {
     // TODO: 解析 revision，检出指定提交并移动当前分支头
     std::string CommitID = Repository::ResolveRevision(rev);
     if (CommitID.empty()) Utils::exitWithMessage("No commit with that id exists.");
+    //初始化
     Commit current = Repository::GetCurrentCommit();
     Commit target = Repository::GetCommitbyID(CommitID);
     Index index; 
     index.load();
     Ignore ignore; 
     ignore.load();
+    //未跟踪报错
     if(Repository::HasUntracked(current, target, index, ignore)){
         Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
     }
+    //覆盖工作区内容
     Repository::CheckOutSnapshot(current, target);
     RefStore::WriteRef(RefStore::ReadHEAD(), CommitID);
+    //清空暂存区
     index.clear();
     index.save();
 }
@@ -435,29 +471,33 @@ void SomeObj::merge(const std::string& branch) {
     index.load();
     Ignore ignore;
     ignore.load();
+    std::string BranchPath = RefStore::GetRefPath(branch);
+    //暂存区非空
     if(!index.StagedAdd.empty()||!index.StagedRemove.empty()){
         Utils::exitWithMessage("You have uncommitted changes.");
     }
-    if(!Utils::isFile(".gitlite/refs/heads/" + branch)){
+    //branch不存在
+    if(!Utils::isFile(BranchPath)){
         Utils::exitWithMessage("A branch with that name does not exist.");
     }
     std::string CurrBranch = RefStore::ReadHEAD();
+    //不能自行合并
     if(CurrBranch == branch){
         Utils::exitWithMessage("Cannot merge a branch with itself.");
     }
+    //初始化
     std::string CurrID = RefStore::ReadRef(CurrBranch);
     std::string GivenID = RefStore::ReadRef(branch);
     Commit curr = Repository::GetCommitbyID(CurrID);
     Commit given = Repository::GetCommitbyID(GivenID);
     std::string SplitID = Repository::FindSplit(CurrID, GivenID);
     Commit Split = Repository::GetCommitbyID(SplitID);
-
-    
+    //有祖先关系
     if(SplitID == GivenID){
         Utils::exitWithMessage("Given branch is an ancestor of the current branch.");
     }
     if(SplitID == CurrID){
-        //改变当前分支引用头
+        //改变当前分支引用头，覆盖工作区内容
         if (Repository::HasUntracked(curr, given, index, ignore)) {
             Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
         }
@@ -490,24 +530,96 @@ void SomeObj::merge(const std::string& branch) {
 
 // ---------------- Bonus-1：add-remote / rm-remote / push / fetch / pull ----------------
 
-void SomeObj::addRemote(const std::string&, const std::string&) {
+void SomeObj::addRemote(const std::string& remote, const std::string& path) {
     // TODO: 保存远程仓库地址
+    //判断非法变量名
+    if(!IsValidRefName(remote)){
+        Utils::exitWithMessage("Incorrect operands.");
+    }
+    auto configs = Repository::ReadConfig();
+    //判断重名
+    if (configs.count(remote)) {
+        Utils::exitWithMessage("A remote with that name already exists.");
+    }
+    if (Utils::isFile(".gitlite/refs/heads/" + remote)) {
+        Utils::exitWithMessage("A remote with that name already exists.");
+    }
+    configs[remote] = path;
+    Repository::SaveConfig(configs);
 }
 
-void SomeObj::rmRemote(const std::string&) {
+void SomeObj::rmRemote(const std::string& remote) {
     // TODO: 删除远程仓库信息
+    auto configs = Repository::ReadConfig();
+    //判断是否存在
+    if(!configs.count(remote)){
+        Utils::exitWithMessage("A remote with that name does not exist.");
+    }
+    configs.erase(remote);
+    Repository::SaveConfig(configs);
 }
 
-void SomeObj::push(const std::string&, const std::string&) {
+void SomeObj::push(const std::string& remote, const std::string& branch) {
     // TODO: 将当前分支的提交推送到远程分支
+    if (!IsValidRefName(remote) || !IsValidRefName(branch)) {
+        Utils::exitWithMessage("Incorrect operands.");
+    }
+    // 查config确认远程是否存在，并确认远程名是否有效
+    auto configs = Repository::ReadConfig();
+    if (!configs.count(remote)) {
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    std::string RemotePath = configs[remote];
+    if (!Utils::isDirectory(RemotePath)) {
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    //获取remote仓库的ref path与ref id，检查祖先关系
+    std::string LocalID = RefStore::ReadRef(Repository::GetCurrentBranch());
+    std::string RemoteRefPath = RemotePath + "/refs/heads/" + branch;
+    std::string RemoteID = "";
+    if(Utils::isFile(RemoteRefPath)){
+        RemoteID = Utils::readContentsAsString(RemoteRefPath);
+    }
+
+    if(!RemoteID.empty()){
+        if (!Repository::IsAncestor(RemoteID, LocalID)) {
+            Utils::exitWithMessage("Please pull down remote changes before pushing.");
+        }
+    }
+    //复制内容
+    Repository::CopyObjects(".gitlite", RemotePath);
+    Utils::writeContents(RemoteRefPath, LocalID);
 }
 
-void SomeObj::fetch(const std::string&, const std::string&) {
+void SomeObj::fetch(const std::string& remote, const std::string& branch) {
     // TODO: 将远程分支的提交与 blob 复制到本地
+    if (!IsValidRefName(remote) || !IsValidRefName(branch)) {
+        Utils::exitWithMessage("Incorrect operands.");
+    }
+    // 查config确认远程是否存在，并确认远程名和分支名是否有效
+    auto configs = Repository::ReadConfig();
+    if (!configs.count(remote)) {
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    std::string RemotePath = configs[remote];
+    if (!Utils::isDirectory(RemotePath)) {
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    std::string RemoteRefPath = RemotePath + "/refs/heads/" + branch;
+    if(!Utils::isFile(RemoteRefPath)){
+        Utils::exitWithMessage("That remote does not have that branch.");
+    }
+    //写入
+    std::string RemoteID = Utils::readContentsAsString(RemoteRefPath);
+    Repository::CopyObjects(RemotePath,".gitlite");
+    RefStore::WriteRef(remote + "/" + branch, RemoteID);
 }
 
-void SomeObj::pull(const std::string&, const std::string&) {
+void SomeObj::pull(const std::string& remote, const std::string& branch) {
     // TODO: fetch 后将取回的分支合并到当前分支
+    //等价于先fetch后merge
+    fetch(remote, branch);
+    merge(remote + "/" + branch);
 }
 
 // ---------------- Bonus-2：diff / show ----------------

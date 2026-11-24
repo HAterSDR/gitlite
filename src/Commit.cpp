@@ -20,11 +20,12 @@ std::string Commit::Serialize() const{
 Commit Commit::Deserialize(const std::string& text){
     Commit commit_;
     //反序列化commit的信息
-    //去掉开头的commit
+    //如果开头有commit，去掉开头的commit
     std::string CleanText = text;
     if (CleanText.rfind("commit ", 0) == 0) {
         CleanText = CleanText.substr(7); 
     }
+    //根据文本中的信息存入commit中
     std::istringstream in(CleanText);
     std::string line;
     while(getline(in, line)){
@@ -42,13 +43,16 @@ Commit Commit::Deserialize(const std::string& text){
     return commit_;
 }
 bool Commit::isTracked(const std::string& filename) const{
+    //判断filename是否被当前commit跟踪
     return snapshot.count(filename) > 0;
 }
 std::string Commit::id() const{
+    //返回当前commit的sha
     std::string text = (*this).Serialize();
     return Utils::sha1("commit " + text);
 }
 void Commit::Print() const{
+    //打印当前commit的信息，用在log中
     Commit current = *this;
     std::string CurrentID = id(); 
     std::cout << "===\n";
@@ -56,6 +60,7 @@ void Commit::Print() const{
     if(current.parents.size() >= 2){
         std::cout << "Merge: " << current.parents[0].substr(0,7) << " " << current.parents[1].substr(0,7) << "\n";
     }
+    //转换时间格式
     std::time_t t = static_cast<std::time_t>(current.timestamp);
     std::tm* tm = std::localtime(&t);
     char TimeBuffer[80];
